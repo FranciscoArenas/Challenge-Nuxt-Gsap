@@ -1,11 +1,12 @@
 <template>
   <div class="slider">
-    <div class="slides">
+    <div
+      class="slides"
+      @click="handleSlideClick">
       <!-- Slide Anterior -->
       <div
         v-if="showPrevSlide"
-        class="slide prev-slide"
-        @click="prevSlide">
+        class="slide prev-slide">
         <div class="slide-image">
           <img
             v-if="duplicatedSlides[getPrevIndex()].media.type === 'image'"
@@ -48,8 +49,7 @@
       <!-- Slide Siguiente -->
       <div
         v-if="showNextSlide"
-        class="slide next-slide"
-        @click="nextSlide">
+        class="slide next-slide">
         <div class="slide-image">
           <img
             v-if="duplicatedSlides[getNextIndex()].media.type === 'image'"
@@ -102,7 +102,7 @@
 </template>
 
 <script setup>
-  import { ref, onMounted, computed, watch } from "vue";
+  import { ref, onMounted, computed, watch, nextTick } from "vue";
   import { useNuxtApp } from "#app";
 
   const { $gsap: gsap, $CustomEase: CustomEase } = useNuxtApp();
@@ -218,7 +218,7 @@
     if (activeSlide) activeSlide.removeAttribute("style");
     if (prevSlide) prevSlide.removeAttribute("style");
     if (nextSlide) nextSlide.removeAttribute("style");
-
+    console.log(activeSlide, prevSlide, nextSlide, "slide");
     isAnimating.value = true;
 
     // Calcular el nuevo índice
@@ -249,8 +249,17 @@
         const incomingSlide = document.querySelector(
           direction === "next" ? ".slide.next-slide" : ".slide.prev-slide"
         );
+        const newSlide = document.querySelector(
+          direction === "next" ? ".slide.prev-slide" : ".slide.next-slide"
+        );
 
-        if (outgoingSlide && incomingSlide) {
+        if (outgoingSlide && incomingSlide && newSlide) {
+          newSlide.classList.remove(
+            direction === "next" ? "prev-slide" : "next-slide"
+          );
+          newSlide.classList.add(
+            direction === "next" ? "next-slide" : "prev-slide"
+          );
           outgoingSlide.classList.remove("active-slide");
           outgoingSlide.classList.add(
             direction === "next" ? "prev-slide" : "next-slide"
@@ -269,14 +278,35 @@
     const incomingSlide = document.querySelector(
       direction === "next" ? ".slide.next-slide" : ".slide.prev-slide"
     );
+    const newSlide = document.querySelector(
+      direction === "next" ? ".slide.prev-slide" : ".slide.next-slide"
+    );
+    const outgoingSlide = document.querySelector(".slide.active-slide");
 
-    if (incomingSlide) {
+    if (incomingSlide && outgoingSlide && newSlide) {
+      // Configuración del slide ACTIVO (asegurar que está en la posición inicial)
+      gsap.set(outgoingSlide, {
+        left: "50%",
+        scale: 1,
+        rotation: 0,
+        clipPath: "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)"
+      });
+
+      // Configuración del slide ENTRANTE (posición inicial fuera de la pantalla)
       gsap.set(incomingSlide, {
-        ...slidePositions[direction === "next" ? "next" : "prev"],
+        left: direction === "next" ? "85%" : "15%",
         scale: 0.8,
-
-        transformOrigin: "center center",
+        rotation: direction === "next" ? 90 : -90,
+        opacity: 0.8,
         clipPath: clipPath.closed.start
+      });
+
+      // Configuración del slide NUEVO (el que va a reemplazar al anterior)
+      gsap.set(newSlide, {
+        left: direction === "next" ? "15%" : "85%",
+        scale: 0.4,
+        rotation: direction === "next" ? -90 : 90,
+        opacity: 0
       });
     }
 
@@ -284,7 +314,7 @@
     mainTl
       // Fase 1: Animar el slide activo hacia afuera
       .to(
-        ".slide.active-slide",
+        outgoingSlide,
         {
           left: direction === "next" ? "15%" : "85%",
           scale: 0.8,
@@ -297,7 +327,7 @@
       )
       // Fase 2: Animar el slide entrante al centro
       .to(
-        direction === "next" ? ".slide.next-slide" : ".slide.prev-slide",
+        incomingSlide,
         {
           left: "50%",
           scale: 1,
@@ -310,25 +340,22 @@
       )
       // Fase 3: Reducir y eliminar el slide saliente, luego aparecer en la nueva posición
       .to(
-        direction === "next" ? ".slide.prev-slide" : ".slide.next-slide",
+        newSlide,
         {
           scale: 0.4,
           duration: 1.5,
           ease: "power2.inOut",
           onComplete: () => {
-            const slide = document.querySelector(
-              direction === "next" ? ".slide.prev-slide" : ".slide.next-slide"
-            );
-            if (slide) {
-              slide.style.display = "none";
-              gsap.set(slide, {
+            if (newSlide) {
+              newSlide.style.display = "none";
+              gsap.set(newSlide, {
                 left: direction === "next" ? "85%" : "15%",
                 scale: 0.4,
 
                 rotation: direction === "next" ? 90 : -90,
                 display: "block"
               });
-              gsap.to(slide, {
+              gsap.to(newSlide, {
                 scale: 0.8,
                 opacity: 1,
                 duration: 1.5,
@@ -404,17 +431,15 @@
   };
 
   const nextSlide = () => {
-    if (
-      !isAnimating.value &&
-      (props.loop ||
-        currentSlideIndex.value < duplicatedSlides.value.length - 1)
-    ) {
+    console.log("next");
+    if (!isAnimating.value) {
       transitionSlides("next");
     }
   };
 
   const prevSlide = () => {
-    if (!isAnimating.value && (props.loop || currentSlideIndex.value > 0)) {
+    console.log("prev");
+    if (!isAnimating.value) {
       transitionSlides("prev");
     }
   };
@@ -437,7 +462,6 @@
       "hop",
       "M0,0 C0.488,0.02 0.467,0.286 0.5,0.5 0.532,0.712 0.58,1 1,1"
     );
-
     // Configurar posiciones iniciales
     const slides = document.querySelectorAll(".slide");
     slides.forEach((slide) => {
@@ -474,6 +498,17 @@
       }, props.autoplayDelay);
     }
   });
+  // Delegación de eventos: manejador de click en el contenedor de slides
+  const handleSlideClick = (event) => {
+    // Busca si el elemento clickeado (o su ancestro) tiene la clase .prev-slide
+    const prevEl = event.target.closest(".prev-slide");
+    const nextEl = event.target.closest(".next-slide");
+    if (prevEl) {
+      prevSlide();
+    } else if (nextEl) {
+      nextSlide();
+    }
+  };
 </script>
 
 <style scoped lang="scss">
