@@ -12,7 +12,7 @@
 
   const slidesData = [
     {
-      title: "Serene Mountainscape",
+      title: "Serene space",
       media: {
         type: "image",
         src: "https://images.pexels.com/photos/994605/pexels-photo-994605.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&dpr=2",
@@ -21,7 +21,7 @@
       }
     },
     {
-      title: "Abstract Fluid Art",
+      title: "Gentle Horizon",
       media: {
         type: "video",
         src: "https://videos.pexels.com/video-files/3163534/3163534-uhd_2560_1440_30fps.mp4",
@@ -30,7 +30,7 @@
       }
     },
     {
-      title: "Vídeo de Thirdman comida-desayuno-cruasan-snack",
+      title: "Quiet Flow",
       media: {
         type: "video",
         src: "https://videos.pexels.com/video-files/6959665/6959665-hd_1920_1080_25fps.mp4",

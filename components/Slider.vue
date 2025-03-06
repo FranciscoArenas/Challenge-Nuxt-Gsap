@@ -7,7 +7,7 @@
           v-for="(slide, index) in duplicatedSlides"
           :key="index"
           class="slide"
-          :class="slideClasses.value[index]"
+          :class="slideClasses[index]"
           :ref="(el) => (slideRefs[index] = el)">
           <div class="slide-image">
             <img
@@ -68,7 +68,7 @@
 </template>
 
 <script setup>
-  import { ref, onMounted, computed, watch, nextTick } from "vue";
+  import { ref, onMounted, computed, nextTick } from "vue";
   import { useNuxtApp } from "#app";
   const slideRefs = ref([]);
   const { $gsap: gsap, $CustomEase: CustomEase } = useNuxtApp();
@@ -116,18 +116,14 @@
   );
   let autoplayInterval = null;
 
-  let slideClasses = (index) => {
-    if (index === activeIndex.value) {
-      return "slide active-slide";
-    }
-    if (index === prevIndex.value) {
-      return "slide prev-slide";
-    }
-    if (index === nextIndex.value) {
-      return "slide next-slide";
-    }
-    return "slide";
-  };
+  const slideClasses = computed(() => {
+    return duplicatedSlides.value.map((_, index) => {
+      if (index === activeIndex.value) return "slide active-slide";
+      if (index === prevIndex.value) return "slide prev-slide";
+      if (index === nextIndex.value) return "slide next-slide";
+      return "slide";
+    });
+  });
 
   const currentSlideBackground = computed(() => {
     return duplicatedSlides.value[currentSlideIndex.value] || {};
@@ -148,9 +144,13 @@
     newTitle.innerHTML = content;
     newTitle.style.position = "absolute";
     newTitle.style.width = "100%";
+    newTitle.style.fontSize = "3vw";
     newTitle.style.color = "#fff";
     newTitle.style.margin = "15px 0";
     newTitle.style.display = "inline-block";
+    newTitle.style.fontFamily = "sans-serif";
+    newTitle.style.fontWeight = "lighter";
+    newTitle.style.overflow = "hidden";
 
     container.appendChild(newTitle);
 
@@ -160,7 +160,7 @@
     gsap.fromTo(
       chars,
       {
-        y: direction === "next" ? 50 : -50,
+        y: direction === "next" ? 70 : -70,
         opacity: 0,
         display: "inline-block",
         margin: 0
@@ -168,8 +168,8 @@
       {
         y: 0,
         opacity: 1,
-        stagger: 0.02,
-        duration: 0.4,
+        stagger: 0.05,
+        duration: 0.7,
         ease: "power2.out",
         onComplete: () => {
           gsap.to(newTitle, {
@@ -191,10 +191,10 @@
       },
       {
         transform: "translate(-50%, -50%) scale(0.4) opacity 1s ease",
-        y: direction === "next" ? -50 : 50,
+        y: direction === "next" ? -70 : 70,
         opacity: 0,
-        stagger: 0.02,
-        duration: 0.4,
+        stagger: 0.05,
+        duration: 0.7,
         ease: "power2.out",
         onComplete: () => {
           if (currentTitle) {
@@ -224,14 +224,6 @@
 
     return spans;
   }
-
-  const updateSlideClasses = () => {
-    slideClasses.value = duplicatedSlides.value.map((_, index) => {
-      if (index === activeIndex.value) return "active-slide";
-      if (index === prevIndex.value) return "prev-slide";
-      if (index === nextIndex.value) return "next-slide";
-    });
-  };
 
   const transitionSlides = (direction) => {
     if (isAnimating.value) return;
@@ -272,7 +264,7 @@
           duplicatedSlides.value[newIndex].title,
           direction
         );
-      }, 0);
+      }, 1);
 
     const slides = document.querySelectorAll(".slide");
     const outgoingSlide = slides[currentSlideIndex.value];
@@ -284,13 +276,12 @@
       direction === "next"
         ? slides[(currentSlideIndex.value + 2) % slides.length]
         : slides[(currentSlideIndex.value - 2) % slides.length];
-    const hiddeSlide =
+    const hiddenSlide =
       direction === "next"
         ? slides[(currentSlideIndex.value - 1 + slides.length) % slides.length]
         : slides[(currentSlideIndex.value + 1) % slides.length];
 
     mainTl
-
       .to(
         outgoingSlide,
         {
@@ -306,7 +297,6 @@
         },
         0
       )
-
       .to(
         incomingSlide,
         {
@@ -320,9 +310,8 @@
         },
         0
       )
-
       .to(
-        hiddeSlide,
+        hiddenSlide,
         {
           opacity: 0,
           transform: "translate(-50%, -50%) scale(0.4) opacity 1s ease",
@@ -373,7 +362,6 @@
 
           onStart: async () => {
             currentSlideIndex.value = newIndex;
-            updateSlideClasses();
           }
         },
         1
@@ -424,6 +412,7 @@
       transitionSlides(direction);
     }
   };
+
   async function preloadVideos() {
     for (const slide of duplicatedSlides.value) {
       if (slide.media.type === "video") {
@@ -439,20 +428,6 @@
         console.log(`Video ${slide.media.src} precargado.`);
       }
     }
-    for (const slide of duplicatedSlides.value) {
-      if (slide.media.type === "video") {
-        const bgVideo = document.createElement("video");
-        bgVideo.src = slide.media.src;
-        bgVideo.preload = "auto";
-        bgVideo.load();
-
-        await new Promise((resolve) => {
-          bgVideo.onloadeddata = resolve;
-        });
-
-        console.log(`Video de fondo ${slide.media.src} precargado.`);
-      }
-    }
   }
 
   onMounted(() => {
@@ -460,7 +435,6 @@
       console.error("GSAP o CustomEase no están disponibles");
       return;
     }
-    updateSlideClasses();
     createAndAnimateTitle(
       duplicatedSlides.value[currentSlideIndex.value].title
     );
@@ -492,13 +466,7 @@
       nextSlide();
     }
   };
-  watch(
-    duplicatedSlides,
-    () => {
-      updateSlideClasses();
-    },
-    { deep: true, immediate: true }
-  );
+
   onUnmounted(() => {
     if (autoplayInterval) clearInterval(autoplayInterval);
     document
