@@ -1,102 +1,68 @@
 <template>
-  <div class="slider">
-    <div
-      class="slides"
-      @click="handleSlideClick">
-      <!-- Slide Anterior -->
-      <div
-        v-if="showPrevSlide"
-        class="slide prev-slide">
-        <div class="slide-image">
-          <img
-            v-if="duplicatedSlides[getPrevIndex()].media.type === 'image'"
-            :src="duplicatedSlides[getPrevIndex()].media.src"
-            :alt="duplicatedSlides[getPrevIndex()].title" />
-          <video
-            v-else
-            :src="duplicatedSlides[getPrevIndex()].media.src"
-            preload="auto"
-            autoplay
-            muted
-            loop
-            playsinline
-            crossorigin="anonymous"></video>
+  <div>
+    <div class="slider">
+      <div class="slides">
+        <!-- Renderizado Dinámico de los Slides -->
+        <div
+          v-for="(slide, index) in duplicatedSlides"
+          :key="index"
+          class="slide"
+          :class="slideClasses.value[index]"
+          :ref="(el) => (slideRefs[index] = el)">
+          <div class="slide-image">
+            <img
+              v-if="slide.media.type === 'image'"
+              :src="slide.media.src"
+              :alt="slide.title" />
+            <video
+              v-else
+              :src="slide.media.src"
+              preload="auto"
+              autoplay
+              muted
+              loop
+              playsinline
+              crossorigin="anonymous"></video>
+          </div>
         </div>
       </div>
 
-      <!-- Slide Activo -->
-      <div class="slide active-slide">
-        <div class="slide-image">
-          <img
-            v-if="duplicatedSlides[currentSlideIndex]?.media?.type === 'image'"
-            :src="duplicatedSlides[currentSlideIndex]?.media?.src"
-            :alt="duplicatedSlides[currentSlideIndex]?.title" />
-          <video
-            v-else
-            :src="duplicatedSlides[currentSlideIndex]?.media?.src"
-            preload="auto"
-            autoplay
-            muted
-            loop
-            playsinline
-            crossorigin="anonymous"></video>
-        </div>
-        <div class="slide-title">
-          <h1>{{ duplicatedSlides[currentSlideIndex]?.title }}</h1>
-        </div>
+      <!-- Título -->
+      <div class="slide-title">
+        <h1>
+          <span>{{ currentSlideBackground?.title }}</span>
+        </h1>
+      </div>
+      <!-- Contador y Navegación -->
+      <div class="slide-counter">
+        <p>{{ currentSlideIndex + 1 }} / {{ duplicatedSlides.length }}</p>
+      </div>
+      <div class="slide-names">
+        <p
+          v-for="(slide, index) in duplicatedSlides"
+          :key="index"
+          :class="{ activeItem: index === currentSlideIndex }"
+          @click="goToSlide(index)">
+          {{ slide.title }}
+        </p>
       </div>
 
-      <!-- Slide Siguiente -->
-      <div
-        v-if="showNextSlide"
-        class="slide next-slide">
-        <div class="slide-image">
-          <img
-            v-if="duplicatedSlides[getNextIndex()].media.type === 'image'"
-            :src="duplicatedSlides[getNextIndex()].media.src"
-            :alt="duplicatedSlides[getNextIndex()].title" />
-          <video
-            v-else
-            :src="duplicatedSlides[getNextIndex()].media.src"
-            preload="auto"
-            autoplay
-            muted
-            loop
-            playsinline
-            crossorigin="anonymous"></video>
-        </div>
+      <!-- Fondo -->
+      <div class="slider-bg">
+        <img
+          v-if="currentSlideBackground?.media?.type === 'image'"
+          :src="currentSlideBackground?.media?.src"
+          :alt="currentSlideBackground?.title" />
+        <video
+          v-else
+          :src="currentSlideBackground?.media?.src"
+          preload="auto"
+          autoplay
+          muted
+          loop
+          playsinline
+          crossorigin="anonymous"></video>
       </div>
-    </div>
-
-    <!-- Contador y Navegación -->
-    <div class="slide-counter">
-      {{ currentSlideIndex + 1 }} / {{ duplicatedSlides.length }}
-    </div>
-    <div class="slide-names">
-      <p
-        v-for="(slide, index) in duplicatedSlides"
-        :key="index"
-        :class="{ activeItem: index === currentSlideIndex }"
-        @click="goToSlide(index)">
-        {{ slide.title }}
-      </p>
-    </div>
-
-    <!-- Fondo -->
-    <div class="slider-bg">
-      <img
-        v-if="currentSlideBackground?.media?.type === 'image'"
-        :src="currentSlideBackground?.media?.src"
-        :alt="currentSlideBackground?.title" />
-      <video
-        v-else
-        :src="currentSlideBackground?.media?.src"
-        preload="auto"
-        autoplay
-        muted
-        loop
-        playsinline
-        crossorigin="anonymous"></video>
     </div>
   </div>
 </template>
@@ -104,23 +70,18 @@
 <script setup>
   import { ref, onMounted, computed, watch, nextTick } from "vue";
   import { useNuxtApp } from "#app";
-
+  const slideRefs = ref([]);
   const { $gsap: gsap, $CustomEase: CustomEase } = useNuxtApp();
 
-  // Props (NO MODIFICAR)
   const props = defineProps({
     slides: { type: Array, required: true },
     loop: { type: Boolean, default: true },
     autoplayDelay: { type: Boolean, default: false }
   });
 
-  const totalSlides = props.slides.length;
-  let activeSlideIndex = 1;
-  // Estado básico - Cambiamos los nombres para evitar conflictos
-  const currentSlideIndex = ref(0); // antes era activeSlide
+  const currentSlideIndex = ref(0);
   const isAnimating = ref(false);
 
-  // Duplicar slides si es necesario
   const duplicatedSlides = computed(() => {
     if (props.slides.length >= 3) {
       return props.slides;
@@ -133,102 +94,163 @@
     }
   });
 
-  const slidePositions = {
-    prev: { left: "15%", top: "50%", scale: 0.8, rotation: -90 },
-    active: { left: "50%", top: "50%", scale: 1, rotation: 0 },
-    next: { left: "85%", top: "50%", scale: 0.8, rotation: 90 }
-  };
-
   const clipPath = {
     closed: {
       left: {
-        start: "polygon(40% 30%, 70% 30%, 70% 70%, 40% 70%)",
-        middle: "polygon(30% 20%, 80% 20%, 80% 80%, 30% 80%)",
-        end: "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)"
+        start: "polygon(30% 30%, 60% 30%, 60% 70%, 30% 70%)"
       },
       right: {
-        start: "polygon(40% 30%, 70% 30%, 70% 70%, 40% 70%)",
-        middle: "polygon(20% 20%, 70% 20%, 70% 80%, 20% 80%)",
-        end: "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)"
+        start: "polygon(40% 30%, 70% 30%, 70% 70%, 40% 70%)"
       }
     }
   };
 
-  // Computed properties mejoradas - Actualizamos las referencias
+  const activeIndex = computed(() => currentSlideIndex.value);
+  const prevIndex = computed(
+    () =>
+      (currentSlideIndex.value - 1 + duplicatedSlides.value.length) %
+      duplicatedSlides.value.length
+  );
+  const nextIndex = computed(
+    () => (currentSlideIndex.value + 1) % duplicatedSlides.value.length
+  );
+  let autoplayInterval = null;
+
+  let slideClasses = (index) => {
+    if (index === activeIndex.value) {
+      return "slide active-slide";
+    }
+    if (index === prevIndex.value) {
+      return "slide prev-slide";
+    }
+    if (index === nextIndex.value) {
+      return "slide next-slide";
+    }
+    return "slide";
+  };
+
   const currentSlideBackground = computed(() => {
     return duplicatedSlides.value[currentSlideIndex.value] || {};
   });
-  const showPrevSlide = computed(() => {
-    return props.loop || currentSlideIndex.value > 0;
-  });
 
-  const showNextSlide = computed(() => {
-    return (
-      props.loop || currentSlideIndex.value < duplicatedSlides.value.length - 1
+  async function createAndAnimateTitle(content, direction) {
+    const container = document.querySelector(".slide-title");
+
+    if (!container) {
+      console.error("No se encontró el contenedor .slide-title");
+      return;
+    }
+
+    const currentTitle = container.querySelector("h1");
+    const currentContent = container.querySelectorAll("h1 span");
+
+    const newTitle = document.createElement("h1");
+    newTitle.innerHTML = content;
+    newTitle.style.position = "absolute";
+    newTitle.style.width = "100%";
+    newTitle.style.color = "#fff";
+    newTitle.style.margin = "15px 0";
+    newTitle.style.display = "inline-block";
+
+    container.appendChild(newTitle);
+
+    const chars = splitTextIntoSpans(newTitle);
+    await nextTick();
+
+    gsap.fromTo(
+      chars,
+      {
+        y: direction === "next" ? 50 : -50,
+        opacity: 0,
+        display: "inline-block",
+        margin: 0
+      },
+      {
+        y: 0,
+        opacity: 1,
+        stagger: 0.02,
+        duration: 0.4,
+        ease: "power2.out",
+        onComplete: () => {
+          gsap.to(newTitle, {
+            duration: 0.5,
+            ease: "power2.out",
+            delay: 0.2,
+            onComplete: () => {}
+          });
+        }
+      }
     );
-  });
-
-  function getSlideIndex(increment) {
-    return (
-      ((activeSlideIndex + increment + duplicatedSlides.value.length - 1) %
-        duplicatedSlides.value.length) +
-      1
+    gsap.fromTo(
+      currentContent,
+      {
+        y: 0,
+        opacity: 1,
+        display: "inline-block",
+        margin: 0
+      },
+      {
+        transform: "translate(-50%, -50%) scale(0.4) opacity 1s ease",
+        y: direction === "next" ? -50 : 50,
+        opacity: 0,
+        stagger: 0.02,
+        duration: 0.4,
+        ease: "power2.out",
+        onComplete: () => {
+          if (currentTitle) {
+            container.removeChild(currentTitle);
+          }
+          gsap.to(currentTitle, {
+            duration: 1,
+            ease: "power2.out",
+            delay: 0.2,
+            onComplete: () => {}
+          });
+        }
+      }
     );
   }
 
-  function createSlide(content, className) {
-    console.log(content);
-    const slide = document.createElement("div");
-    slide.className = `slide ${className}-slide`;
-    console.log(className);
-    slide.innerHTML = `
-    <div class="slide-image">
-      <img src="${content?.media?.src || ""}" alt="${content?.title || ""}" />
-    </div>
-  `;
-    return slide;
+  function splitTextIntoSpans(element) {
+    const text = element.innerText;
+    element.innerHTML = "";
+
+    const spans = text.split("").map((char) => {
+      const span = document.createElement("span");
+      span.innerHTML = char === " " ? "&nbsp;&nbsp;" : char;
+      element.appendChild(span);
+      return span;
+    });
+
+    return spans;
   }
 
-  // Funciones auxiliares actualizadas
-  const getPrevIndex = () => {
-    const prevIndex = currentSlideIndex.value - 1;
-    if (prevIndex < 0) {
-      return props.loop
-        ? duplicatedSlides.value.length - 1
-        : currentSlideIndex.value;
-    }
-    return prevIndex;
-  };
-
-  const getNextIndex = () => {
-    const nextIndex = currentSlideIndex.value + 1;
-    if (nextIndex >= duplicatedSlides.value.length) {
-      return props.loop ? 0 : currentSlideIndex.value;
-    }
-    return nextIndex;
+  const updateSlideClasses = () => {
+    slideClasses.value = duplicatedSlides.value.map((_, index) => {
+      if (index === activeIndex.value) return "active-slide";
+      if (index === prevIndex.value) return "prev-slide";
+      if (index === nextIndex.value) return "next-slide";
+    });
   };
 
   const transitionSlides = (direction) => {
     if (isAnimating.value) return;
-    // Seleccionar los slides
+
     const activeSlide = document.querySelector(".slide.active-slide");
     const prevSlide = document.querySelector(".slide.prev-slide");
     const nextSlide = document.querySelector(".slide.next-slide");
-    // Eliminar estilos en línea de los slides
+
     if (activeSlide) activeSlide.removeAttribute("style");
     if (prevSlide) prevSlide.removeAttribute("style");
     if (nextSlide) nextSlide.removeAttribute("style");
-    console.log(activeSlide, prevSlide, nextSlide, "slide");
     isAnimating.value = true;
 
-    // Calcular el nuevo índice
     const newIndex =
       direction === "next"
         ? (currentSlideIndex.value + 1) % duplicatedSlides.value.length
         : (currentSlideIndex.value - 1 + duplicatedSlides.value.length) %
           duplicatedSlides.value.length;
 
-    // Verificar límites si no está en modo loop
     if (!props.loop) {
       if (
         (direction === "next" && newIndex === 0) ||
@@ -239,174 +261,128 @@
       }
     }
 
-    // Actualizar el índice SOLO UNA VEZ al inicio de la animación
-    currentSlideIndex.value = newIndex;
-
-    const mainTl = gsap.timeline({
-      onComplete: () => {
-        // Actualizar clases sin modificar el índice
-        const outgoingSlide = document.querySelector(".slide.active-slide");
-        const incomingSlide = document.querySelector(
-          direction === "next" ? ".slide.next-slide" : ".slide.prev-slide"
-        );
-        const newSlide = document.querySelector(
-          direction === "next" ? ".slide.prev-slide" : ".slide.next-slide"
-        );
-
-        if (outgoingSlide && incomingSlide && newSlide) {
-          newSlide.classList.remove(
-            direction === "next" ? "prev-slide" : "next-slide"
-          );
-          newSlide.classList.add(
-            direction === "next" ? "next-slide" : "prev-slide"
-          );
-          outgoingSlide.classList.remove("active-slide");
-          outgoingSlide.classList.add(
-            direction === "next" ? "prev-slide" : "next-slide"
-          );
-          incomingSlide.classList.remove(
-            direction === "next" ? "next-slide" : "prev-slide"
-          );
-          incomingSlide.classList.add("active-slide");
+    const mainTl = gsap
+      .timeline({
+        onComplete: () => {
+          isAnimating.value = false;
         }
+      })
+      .add(() => {
+        createAndAnimateTitle(
+          duplicatedSlides.value[newIndex].title,
+          direction
+        );
+      }, 0);
 
-        isAnimating.value = false;
-      }
-    });
+    const slides = document.querySelectorAll(".slide");
+    const outgoingSlide = slides[currentSlideIndex.value];
+    const incomingSlide =
+      direction === "next"
+        ? slides[(currentSlideIndex.value + 1) % slides.length]
+        : slides[(currentSlideIndex.value - 1 + slides.length) % slides.length];
+    const newSlide =
+      direction === "next"
+        ? slides[(currentSlideIndex.value + 2) % slides.length]
+        : slides[(currentSlideIndex.value - 2) % slides.length];
+    const hiddeSlide =
+      direction === "next"
+        ? slides[(currentSlideIndex.value - 1 + slides.length) % slides.length]
+        : slides[(currentSlideIndex.value + 1) % slides.length];
 
-    // Configuración inicial del slide entrante
-    const incomingSlide = document.querySelector(
-      direction === "next" ? ".slide.next-slide" : ".slide.prev-slide"
-    );
-    const newSlide = document.querySelector(
-      direction === "next" ? ".slide.prev-slide" : ".slide.next-slide"
-    );
-    const outgoingSlide = document.querySelector(".slide.active-slide");
-
-    if (incomingSlide && outgoingSlide && newSlide) {
-      // Configuración del slide ACTIVO (asegurar que está en la posición inicial)
-      gsap.set(outgoingSlide, {
-        left: "50%",
-        scale: 1,
-        rotation: 0,
-        clipPath: "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)"
-      });
-
-      // Configuración del slide ENTRANTE (posición inicial fuera de la pantalla)
-      gsap.set(incomingSlide, {
-        left: direction === "next" ? "85%" : "15%",
-        scale: 0.8,
-        rotation: direction === "next" ? 90 : -90,
-        opacity: 0.8,
-        clipPath: clipPath.closed.start
-      });
-
-      // Configuración del slide NUEVO (el que va a reemplazar al anterior)
-      gsap.set(newSlide, {
-        left: direction === "next" ? "15%" : "85%",
-        scale: 0.4,
-        rotation: direction === "next" ? -90 : 90,
-        opacity: 0
-      });
-    }
-
-    // Animación mejorada para mantener los slides
     mainTl
-      // Fase 1: Animar el slide activo hacia afuera
+
       .to(
         outgoingSlide,
         {
           left: direction === "next" ? "15%" : "85%",
           scale: 0.8,
           rotation: direction === "next" ? -90 : 90,
-          duration: 1.5,
+          duration: 2.5,
           ease: "power2.inOut",
-          clipPath: "polygon(30% 30%, 60% 30%, 60% 70%, 30% 70%)"
+          clipPath:
+            direction === "next"
+              ? clipPath.closed.left.start
+              : clipPath.closed.right.start
         },
         0
       )
-      // Fase 2: Animar el slide entrante al centro
+
       .to(
         incomingSlide,
         {
+          rotation: direction === "next" ? 90 : -90,
           left: "50%",
           scale: 1,
           rotation: 0,
-          duration: 1.5,
+          duration: 2.5,
           ease: "power2.inOut",
-          clipPath: "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)"
+          clipPath: "polygon(25% 0%, 75% 0%, 75% 100%, 25% 100%)"
         },
         0
       )
-      // Fase 3: Reducir y eliminar el slide saliente, luego aparecer en la nueva posición
+
+      .to(
+        hiddeSlide,
+        {
+          opacity: 0,
+          transform: "translate(-50%, -50%) scale(0.4) opacity 1s ease",
+          duration: 2,
+          scale: 0.4,
+          clipPath:
+            direction === "prev"
+              ? clipPath.closed.right.start
+              : clipPath.closed.left.start,
+          ease: "power2.inOut"
+        },
+        0
+      )
       .to(
         newSlide,
         {
+          autoAlpha: 0,
+          left: direction === "prev" ? "15%" : "85%",
           scale: 0.4,
-          duration: 1.5,
-          ease: "power2.inOut",
-          onComplete: () => {
-            if (newSlide) {
-              newSlide.style.display = "none";
-              gsap.set(newSlide, {
-                left: direction === "next" ? "85%" : "15%",
-                scale: 0.4,
-
-                rotation: direction === "next" ? 90 : -90,
-                display: "block"
-              });
-              gsap.to(newSlide, {
-                scale: 0.8,
-                opacity: 1,
-                duration: 1.5,
-                ease: "power2.inOut"
-              });
-            }
-          }
+          rotation: direction === "prev" ? -90 : 90,
+          duration: 0,
+          xPercent: -50,
+          yPercent: -50,
+          clipPath:
+            direction === "prev"
+              ? clipPath.closed.left.start
+              : clipPath.closed.right.start
         },
         0
-      );
+      )
+      .to(
+        newSlide,
+        {
+          autoAlpha: 1,
+          duration: 2,
+          ease: "power2.in",
+          scale: 0.8,
+          transform: "translate(-50%, -50%) scale(0.8) opacity 1s ease"
+        },
+        0
+      )
+      .to(
+        ".slider-bg",
+        {
+          opacity: 1,
+          duration: 0.2,
+          ease: "power2.inOut",
 
-    // Animar título
-    const currentTitle = document.querySelector(".slide-title h1");
-    if (currentTitle) {
-      const yOffset = direction === "next" ? 60 : -60;
-      const nextTitle =
-        duplicatedSlides.value[
-          direction === "next" ? getNextIndex() : getPrevIndex()
-        ].title;
+          onStart: async () => {
+            currentSlideIndex.value = newIndex;
+            updateSlideClasses();
+          }
+        },
+        1
+      )
+      .to(".slide", {
+        clearProps: "all",
+        duration: 1.5
+      });
 
-      mainTl
-        .to(
-          currentTitle,
-          {
-            y: -yOffset,
-
-            duration: 0.5,
-            ease: "power2.in"
-          },
-          0
-        )
-        .add(() => {
-          currentTitle.innerHTML = nextTitle;
-        })
-        .fromTo(
-          currentTitle,
-          {
-            y: yOffset,
-            opacity: 0
-          },
-          {
-            y: 0,
-            opacity: 1,
-            duration: 0.5,
-            ease: "power2.out"
-          },
-          ">-0.1"
-        );
-    }
-
-    // Animar fondo
     const bg = document.querySelector(".slider-bg");
     if (bg) {
       mainTl
@@ -431,14 +407,12 @@
   };
 
   const nextSlide = () => {
-    console.log("next");
     if (!isAnimating.value) {
       transitionSlides("next");
     }
   };
 
   const prevSlide = () => {
-    console.log("prev");
     if (!isAnimating.value) {
       transitionSlides("prev");
     }
@@ -450,57 +424,66 @@
       transitionSlides(direction);
     }
   };
+  async function preloadVideos() {
+    for (const slide of duplicatedSlides.value) {
+      if (slide.media.type === "video") {
+        const video = document.createElement("video");
+        video.src = slide.media.src;
+        video.preload = "auto";
+        video.load();
+
+        await new Promise((resolve) => {
+          video.onloadeddata = resolve;
+        });
+
+        console.log(`Video ${slide.media.src} precargado.`);
+      }
+    }
+    for (const slide of duplicatedSlides.value) {
+      if (slide.media.type === "video") {
+        const bgVideo = document.createElement("video");
+        bgVideo.src = slide.media.src;
+        bgVideo.preload = "auto";
+        bgVideo.load();
+
+        await new Promise((resolve) => {
+          bgVideo.onloadeddata = resolve;
+        });
+
+        console.log(`Video de fondo ${slide.media.src} precargado.`);
+      }
+    }
+  }
 
   onMounted(() => {
     if (!gsap || !CustomEase) {
       console.error("GSAP o CustomEase no están disponibles");
       return;
     }
-
+    updateSlideClasses();
+    createAndAnimateTitle(
+      duplicatedSlides.value[currentSlideIndex.value].title
+    );
     gsap.registerPlugin(CustomEase);
     CustomEase.create(
       "hop",
       "M0,0 C0.488,0.02 0.467,0.286 0.5,0.5 0.532,0.712 0.58,1 1,1"
     );
-    // Configurar posiciones iniciales
-    const slides = document.querySelectorAll(".slide");
-    slides.forEach((slide) => {
-      if (slide.classList.contains("prev-slide")) {
-        gsap.set(slide, {
-          left: "15%",
-          scale: 0.8,
-          rotation: -90,
-          clipPath: "polygon(30% 30%, 60% 30%, 60% 70%, 30% 70%)"
-        });
-      } else if (slide.classList.contains("next-slide")) {
-        gsap.set(slide, {
-          left: "85%",
-          scale: 0.8,
-          rotation: 90,
-          clipPath: "polygon(30% 30%, 60% 30%, 60% 70%, 30% 70%)"
-        });
-      } else {
-        gsap.set(slide, {
-          left: "50%",
-          scale: 1,
-          rotation: 0,
-          clipPath: "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)"
-        });
-      }
-    });
+    document
+      .querySelector(".slides")
+      ?.addEventListener("click", handleSlideClick);
 
-    // Configurar autoplay si está habilitado
     if (props.loop && props.autoplayDelay > 0) {
-      setInterval(() => {
+      autoplayInterval = setInterval(() => {
         if (!isAnimating.value) {
           nextSlide();
         }
-      }, props.autoplayDelay);
+      }, 3000);
     }
+    preloadVideos();
   });
-  // Delegación de eventos: manejador de click en el contenedor de slides
+
   const handleSlideClick = (event) => {
-    // Busca si el elemento clickeado (o su ancestro) tiene la clase .prev-slide
     const prevEl = event.target.closest(".prev-slide");
     const nextEl = event.target.closest(".next-slide");
     if (prevEl) {
@@ -509,6 +492,20 @@
       nextSlide();
     }
   };
+  watch(
+    duplicatedSlides,
+    () => {
+      updateSlideClasses();
+    },
+    { deep: true, immediate: true }
+  );
+  onUnmounted(() => {
+    if (autoplayInterval) clearInterval(autoplayInterval);
+    document
+      .querySelector(".slides")
+      ?.removeEventListener("click", handleSlideClick);
+    slideRefs.value = [];
+  });
 </script>
 
 <style scoped lang="scss">
